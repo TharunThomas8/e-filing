@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Document Generator</title>
+  <link rel="stylesheet" href="static/styles.css">
+</head>
+<body>
+  <div class="container">
+    <form method="POST">
+      {% for field in fields %}
+        <div class="form-group">
+          <label for="{{ field.name }}">{{ field.label }}:</label>
+          {% if field.datatype == 'text' %}
+            <input type="text" name="{{ field.name }}" id="{{ field.name }}" required>
+          {% elif field.datatype == 'number' %}
+            <input type="number" name="{{ field.name }}" id="{{ field.name }}" required>
+          {% elif field.datatype == 'date' %}
+            <input type="date" name="{{ field.name }}" id="{{ field.name }}" required>
+          {% endif %}
+        </div>
+      {% endfor %}
+      <button type="submit">Generate Document</button>
+    </form>
+  </div>
+</body>
+</html>

@@ -1,0 +1,117 @@
+/* General Reset */
+* {
+    margin: 0;
+    padding: 5px;
+    box-sizing: border-box;
+    width: 100%;
+  }
+  
+  /* Body Styling */
+  body {
+    font-family: 'Arial', sans-serif;
+    background-color: #bfbfc4;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    /* height: 100vh; */
+    padding: 0 20px;  /* Add padding for body */
+  }
+  
+  /* Container for the Form */
+  .container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 50%;
+    height: 100%;
+    margin: 25px;
+    background-color: #5b646d;
+    border-radius: 10px;  /* Rounded edges */
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);  /* Soft shadow effect */
+  }
+  
+  
+  /* Form Wrapper to Center the Form */
+  .form-wrapper {
+    background-color: white;
+    padding: 40px 30px;  /* Padding on top, bottom, left, and right */
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 600px;
+    overflow: hidden;
+  }
+  
+  /* Heading Styling */
+  h1 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #5779a5;
+    font-size: 24px;
+    font-weight: bold;
+  }
+  
+  /* Form Group Styling */
+  .form-group {
+    margin: 15px 0px;
+  }
+  
+  /* Label Styling */
+  label {
+    display: block;
+    font-size: 25px;
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #9193ff;
+  }
+  
+  /* Input Styling */
+  input[type="text"] {
+    /* width: 80%; */
+    padding: 12px;  /* Add padding for inputs */
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+    transition: all 0.3s ease;
+    margin-bottom: 10px;  /* Adds space below input fields */
+  }
+  
+  input[type="text"]:focus {
+    border-color: #0056b3;
+    outline: none;
+    background-color: #fff;
+  }
+  
+  /* Button Styling */
+  button {
+    width: 100%;
+    padding: 15px;  /* Add padding for the button */
+    font-size: 16px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  button:hover {
+    background-color: #0056b3;
+  }
+  
+  /* Responsive Design */
+  @media (max-width: 600px) {
+    .form-wrapper {
+      padding: 30px 20px;  /* Adjust padding on smaller screens */
+    }
+    
+    button {
+      font-size: 14px;
+    }
+    
+    input[type="text"] {
+      font-size: 14px;
+    }
+  }
+  
