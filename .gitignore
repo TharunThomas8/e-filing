@@ -1,5 +1,5 @@
 # Ignore environment variable file
-env
+env/
 
 # Ignore generated document files
 static/output/
