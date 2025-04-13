@@ -84,6 +84,16 @@ button {
   margin-top: 15px;
 }
 
+#clear_btn{
+  color: #9095A0FF;
+  background: #00000000;
+}
+
 button:hover {
   background-color: #2e45e0;
+}
+
+#clear_btn:hover{
+  color: #9095A0FF;
+  background-color: #EAECEFFF;
 }

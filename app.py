@@ -82,7 +82,7 @@ def form():
         }
         replacements["(CURRENT_DATE)"] = get_formatted_current_date()
 
-        print(replacements)
+        # print(replacements)
         output_filename = f"{get_custom_datetime_format()}_output.docx"
         output_path = os.path.join("static/output", output_filename)
 
