@@ -92,5 +92,5 @@ def form():
 
     return render_template("form.html", fields=FIELDS)
 
-if __name__ == "__main__":
-    app.run(debug=True)
+if __name__ == '__main__':
+    app.run(host='13.232.99.89')
