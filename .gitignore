@@ -2,5 +2,5 @@
 env/
 
 # Ignore generated document files
-static/output/
+static/output/*
 .vercel
