@@ -1,9 +1,18 @@
-from flask import Flask, render_template, request, send_file
+from flask import Flask, render_template, request, send_file, make_response
 from docx import Document
 from datetime import datetime
 import os
+import tempfile
+import io
+import boto3 
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
+
+s3 = boto3.client('s3')
+bucket_name = "efiling-store"
 
 def get_custom_datetime_format():
     return datetime.now().strftime("%d_%m_%YT%H_%M_%S")
@@ -42,7 +51,66 @@ def process_docx(template_path, replacements, output_path):
                     if old_text in cell.text:
                         cell.text = cell.text.replace(old_text, new_text)
 
-    doc.save(output_path)
+    # Save to an in-memory buffer
+    output_stream = io.BytesIO()
+    doc.save(output_stream)
+    output_stream.seek(0)
+
+    # Upload the updated document to S3
+    s3.upload_fileobj(output_stream, bucket_name, output_path)
+
+def serve_s3_file_as_attachment(s3_path, download_filename=None):
+    """
+    Download a file from S3 and serve it as an attachment to the user.
+    
+    Args:
+        s3_path (str): Path to the file in S3, without leading slash
+        download_filename (str, optional): Filename to use for the download.
+            If not provided, uses the filename from s3_path.
+    
+    Returns:
+        Flask response object with file attachment
+    """
+    
+    # Use the provided filename or extract from s3_path
+    if download_filename is None:
+        download_filename = os.path.basename(s3_path)
+    
+    # Create a temporary file to store the downloaded document
+    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(download_filename)[1]) as temp_file:
+        temp_path = temp_file.name
+    
+    # Download the file from S3
+    s3.download_file(bucket_name, s3_path, temp_path)
+    
+    # Determine MIME type based on file extension
+    mime_types = {
+        '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        '.pdf': 'application/pdf',
+        '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        '.csv': 'text/csv',
+        '.txt': 'text/plain',
+        # Add more MIME types as needed
+    }
+    file_ext = os.path.splitext(download_filename)[1].lower()
+    mime_type = mime_types.get(file_ext, 'application/octet-stream')
+    
+    # Send the file to the user as an attachment
+    response = make_response(send_file(
+        temp_path,
+        mimetype=mime_type,
+        as_attachment=True,
+        download_name=download_filename
+    ))
+    
+    # Clean up the temporary file after the response is sent
+    @response.call_on_close
+    def cleanup():
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+    
+    return response
+
 
 @app.route("/", methods=["GET", "POST"])
 def form():
@@ -84,11 +152,11 @@ def form():
 
         # print(replacements)
         output_filename = f"{get_custom_datetime_format()}_output.docx"
-        output_path = os.path.join("static/output", output_filename)
+        output_path = "/output/"+output_filename
 
         process_docx("template.docx", replacements, output_path)
-
-        return send_file(output_path, as_attachment=True)
+        
+        return serve_s3_file_as_attachment(output_path, output_filename)
 
     return render_template("form.html", fields=FIELDS)
 
