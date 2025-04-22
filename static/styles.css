@@ -97,3 +97,10 @@ button:hover {
   color: #9095A0FF;
   background-color: #EAECEFFF;
 }
+
+@media screen and (max-width: 600px) {
+
+  .container {
+    width: 90%;
+  }
+}
