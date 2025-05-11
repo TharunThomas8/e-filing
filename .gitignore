@@ -6,3 +6,4 @@ env/
 static/output/*
 !static/output/.gitkeep
 .vercel
+__pycache__

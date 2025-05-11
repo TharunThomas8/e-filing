@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <title>Document Generator</title>
   <link rel="stylesheet" href="static/styles.css">
+  <script src="static/script.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
@@ -16,9 +17,12 @@
           {% if field.datatype == 'text' %}
             <input type="text" name="{{ field.name }}" id="{{ field.name }}" required>
           {% elif field.datatype == 'number' %}
-            <input type="number" name="{{ field.name }}" id="{{ field.name }}" required>
+            <input type="number" name="{{ field.name }}" id="{{ field.name }}" required oninput="convertToWords(this)">
+            <div id="words-{{ field.name }}" class="words-output"></div>
           {% elif field.datatype == 'date' %}
             <input type="date" name="{{ field.name }}" id="{{ field.name }}" required>
+          {% elif field.datatype == 'textarea' %}
+            <textarea name="{{ field.name }}" id="{{ field.name }}" required>{{ field.default }}</textarea>
           {% endif %}
         </div>
       {% endfor %}
@@ -26,18 +30,5 @@
       <button type="submit">Generate Document</button>
     </form>
   </div>
-<script>
-  document.getElementById('clear_btn').addEventListener('click', function() {
-    const confirmClear = confirm("Are you sure you want to clear all form fields?");
-    
-    if (confirmClear) {
-      const inputs = document.querySelectorAll('input');
-      
-      inputs.forEach(input => {
-        input.value = '';
-      });
-    }
-  });
-</script>
 </body>
 </html>
