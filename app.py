@@ -74,10 +74,21 @@ def form():
             for field in FIELDS
         }
 
+        replacements["(CAUSE_OF_ACTION)"] = "The cause of action for this claim petition arose on " + replacements["(DATE1)"] + ", when the petitioner received a notice from the respondent. "
+        if replacements["(COA_AMNT3)"]!= '0':
+            replacements["(CAUSE_OF_ACTION)"]+=  "The petitioner received an amount of " + replacements["(COA_AMNT3)"] + " as tower foot area compensation. "
+        if replacements["(COA_AMNT1)"]!= '0':
+            replacements["(CAUSE_OF_ACTION)"]+=  "The petitioner also received an amount of " + replacements["(COA_AMNT1)"] + " as tower foot area compensation. "
+        if replacements["(COA_AMNT2)"]!= '0':
+            replacements["(CAUSE_OF_ACTION)"]+=  "Thereafter the petitioner received an amount of " + replacements["(COA_AMNT2)"] + " as tower foot area compensation. "
+        
+        if replacements["(ARES2)"]!=0:
+            replacements["(ARES2)"] = "and " + replacements["(ARES2)"] + " in Sy.No. " + replacements["(SYNO2)"]
+        
         replacements["(DISTRICT)"] = replacements["(DISTRICT)"].upper()
         replacements["(CURRENT_DATE)"] = get_formatted_current_date()
         replacements["(TOTAL_AMOUNT)"] = str(int(replacements["(AMNT1)"]) + int(replacements["(AMNT2)"]) + int(replacements["(AMNT3)"]))
-        replacements["(CAUSE_OF_ACTION)"] += "and there after continually at " + replacements["(VILLAGE)"] + " Village in " + replacements["(TALUK)"] + " Taluk which is within the jurisdiction of this Honourable Court."
+        replacements["(CAUSE_OF_ACTION)"] += "And there after continually at " + replacements["(VILLAGE)"] + " Village in " + replacements["(TALUK)"] + " Taluk which is within the jurisdiction of this Honourable Court."
         
         if request.form.get('petitioner_address_checker') == 'on':
             replacements["(PETITIONER_ADDRESS)"] = replacements["(VILLAGE)"] + ' Village, ' + replacements["(TALUK)"] + ' Taluk, ' + replacements["(DISTRICT)"] + ' District. PIN -' + replacements["(PINCODE)"]
