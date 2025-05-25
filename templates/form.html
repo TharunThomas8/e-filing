@@ -11,6 +11,9 @@
   <div class="container">
     <h1>Legal Document Generation Form</h1>
     <form method="POST">
+      <label>Reuse details for Petitioner Address:
+        <input type="checkbox" name="petitioner_address_checker" id="petitioner_address_checker">
+      </label>
       {% for field in fields %}
         <div class="form-group">
           <label for="{{ field.name }}">{{ field.label }}:</label>

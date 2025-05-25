@@ -73,9 +73,17 @@ def form():
             )
             for field in FIELDS
         }
+
+        replacements["(DISTRICT)"] = replacements["(DISTRICT)"].upper()
         replacements["(CURRENT_DATE)"] = get_formatted_current_date()
         replacements["(TOTAL_AMOUNT)"] = str(int(replacements["(AMNT1)"]) + int(replacements["(AMNT2)"]) + int(replacements["(AMNT3)"]))
         replacements["(CAUSE_OF_ACTION)"] += "and there after continually at " + replacements["(VILLAGE)"] + " Village in " + replacements["(TALUK)"] + " Taluk which is within the jurisdiction of this Honourable Court."
+        
+        if request.form.get('petitioner_address_checker') == 'on':
+            replacements["(PETITIONER_ADDRESS)"] = replacements["(VILLAGE)"] + ' Village, ' + replacements["(TALUK)"] + ' Taluk, ' + replacements["(DISTRICT)"] + ' District. PIN -' + replacements["(PINCODE)"]
+        else:
+            replacements["(PETITIONER_ADDRESS)"] = ''
+            
 
         # print(replacements)
         output_filename = f"{get_custom_datetime_format()}_output.docx"
