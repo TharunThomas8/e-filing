@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
+app = Flask(__name__)
+
 @dataclass
 class AppConfig:
     """Application configuration class"""
@@ -291,9 +293,9 @@ def create_app(config: Optional[AppConfig] = None) -> Flask:
             output_filename = f"{doc_processor.get_custom_datetime_format()}_{doc_type}_output.docx"
             output_path = f"{config.output_prefix}{output_filename}"
             
-            print("-----------------------")
-            print(config.templates[doc_type])
-            print("-----------------------")
+            # print("-----------------------")
+            # print(config.templates[doc_type])
+            # print("-----------------------")
             
             # Process document
             if not doc_processor.process_docx(config.templates[doc_type], replacements, output_path):
@@ -319,7 +321,7 @@ def create_app(config: Optional[AppConfig] = None) -> Flask:
 def main():
     """Main application entry point"""
     config = AppConfig(
-        debug=os.getenv('FLASK_DEBUG', 'False').lower() == 'true',
+        debug=os.getenv('FLASK_DEBUG', 'True').lower() == 'true',
         host=os.getenv('FLASK_HOST', '0.0.0.0'),
         port=int(os.getenv('FLASK_PORT', 5000))
     )
