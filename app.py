@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, abort
+from flask import Flask, render_template, request, abort, jsonify
 from docx import Document
 from datetime import datetime
 import os
@@ -10,21 +10,29 @@ from dotenv import load_dotenv
 import logging
 from typing import Dict, Any, Optional
 from dataclasses import dataclass, field
-from form_fields import FIELDS
-from s3_bucketHandler import serve_s3_file_as_attachment
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Load environment variables
 load_dotenv()
 
-app = Flask(__name__)
+# Import your modules with error handling
+try:
+    from form_fields import FIELDS
+    from s3_bucketHandler import serve_s3_file_as_attachment
+except ImportError as e:
+    logger.error(f"Failed to import modules: {e}")
+    FIELDS = []
+    # Fallback function if s3_bucketHandler is not available
+    def serve_s3_file_as_attachment(s3_client, bucket, path, filename):
+        return jsonify({"error": "S3 handler not available"}), 500
 
 @dataclass
 class AppConfig:
     """Application configuration class"""
-    bucket_name: str = "efiling-store"
+    bucket_name: str = os.getenv("S3_BUCKET_NAME", "efiling-store")
     template_file: str = "template.docx"
     templates: Dict[str, str] = field(default_factory=lambda: {
         "docket-template": "docket_template.docx",
@@ -33,7 +41,6 @@ class AppConfig:
         "notice-to-all-respondants-template": "notice_to_all_respondants_template.docx",
         "process-memo-template": "process_memo_template.docx",
         "vakkalath-template": "vakkalath_template.docx"
-        
     })
     output_prefix: str = "/output/"
     host: str = "0.0.0.0"
@@ -127,6 +134,9 @@ class FormDataProcessor:
     @staticmethod
     def validate_form_data(data: Dict[str, Any]) -> bool:
         """Validate required form fields"""
+        if not FIELDS:
+            return True
+            
         required_fields = [field["name"] for field in FIELDS if field.get("required", False)]
         missing_fields = [field for field in required_fields if not data.get(field)]
         
@@ -207,127 +217,173 @@ class FormDataProcessor:
         
         return computed
 
-def create_app(config: Optional[AppConfig] = None) -> Flask:
-    """Application factory function"""
-    if config is None:
-        config = AppConfig()
-    
-    app = Flask(__name__)
-    
-    # Initialize S3 client
-    try:
-        s3_client = boto3.client('s3')
-    except NoCredentialsError:
-        logger.error("AWS credentials not found")
-        raise
-    
-    # Initialize processors
+# Initialize Flask app at module level (CRITICAL for Vercel)
+app = Flask(__name__)
+
+# Initialize configuration
+config = AppConfig()
+
+# Initialize S3 client with error handling
+s3_client = None
+try:
+    s3_client = boto3.client(
+        's3',
+        aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+        aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+        region_name=os.getenv('AWS_REGION', 'us-east-1')
+    )
+    logger.info("S3 client initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize S3 client: {e}")
+
+# Initialize processors
+doc_processor = None
+form_processor = FormDataProcessor()
+
+if s3_client:
     doc_processor = DocumentProcessor(s3_client, config.bucket_name)
-    form_processor = FormDataProcessor()
-    
-    @app.route("/", methods=["GET", "POST"])
-    def form():
-        """Main form handler"""
+
+@app.route("/", methods=["GET", "POST"])
+def form():
+    """Main form handler"""
+    try:
         if request.method == "GET":
+            if not FIELDS:
+                return jsonify({"error": "Form fields not configured"}), 500
             return render_template("form.html", fields=FIELDS)
         
+        # Check if services are available
+        if not s3_client or not doc_processor:
+            return jsonify({"error": "Service temporarily unavailable - S3 not configured"}), 503
+        
         # Process POST request
-        try:
-            form_data = request.form.to_dict()
-            
-            # Validate form data
-            if not form_processor.validate_form_data(form_data):
-                abort(400, description="Missing required form fields")
-            
-            # Build replacements
-            replacements = form_processor.build_replacements(form_data)
-            
-            # Handle petitioner address
-            if request.form.get('petitioner_address_checker') == 'on':
-                village = replacements.get("(VILLAGE)", "")
-                taluk = replacements.get("(TALUK)", "")
-                district = replacements.get("(DISTRICT)", "")
-                pincode = replacements.get("(PINCODE)", "")
-                replacements["(PETITIONER_ADDRESS)"] = f"{village} Village, {taluk} Taluk, {district} District. PIN -{pincode}"
-            else:
-                replacements["(PETITIONER_ADDRESS)"] = ""
-            
-            # Generate output filename and path
-            output_filename = f"{doc_processor.get_custom_datetime_format()}_output.docx"
-            output_path = f"{config.output_prefix}{output_filename}"
-            
-            # Process document
-            if not doc_processor.process_docx(config.template_file, replacements, output_path):
-                abort(500, description="Document processing failed")
-            
-            # Serve file
-            return serve_s3_file_as_attachment(s3_client, config.bucket_name, output_path, output_filename)
-            
-        except Exception as e:
-            logger.error(f"Form processing error: {e}")
-            abort(500, description="Internal server error")
-    
-    @app.route("/download-document/<doc_type>", methods=["POST"])
-    def download_document(doc_type):
-        """Handle document download"""
-        try:
-            form_data = request.form.to_dict()
-            
-            # Validate form data
-            if not form_processor.validate_form_data(form_data):
-                abort(400, description="Missing required form fields")
-            
-            replacements = form_processor.build_replacements(form_data)
-            
-            # Handle petitioner address
-            if request.form.get('petitioner_address_checker') == 'on':
-                village = replacements.get("(VILLAGE)", "")
-                taluk = replacements.get("(TALUK)", "")
-                district = replacements.get("(DISTRICT)", "")
-                pincode = replacements.get("(PINCODE)", "")
-                replacements["(PETITIONER_ADDRESS)"] = f"{village} Village, {taluk} Taluk, {district} District. PIN -{pincode}"
-            else:
-                replacements["(PETITIONER_ADDRESS)"] = ""
-            
-            # Generate output filename and path for document
-            output_filename = f"{doc_processor.get_custom_datetime_format()}_{doc_type}_output.docx"
-            output_path = f"{config.output_prefix}{output_filename}"
-            
-            # print("-----------------------")
-            # print(config.templates[doc_type])
-            # print("-----------------------")
-            
-            # Process document
-            if not doc_processor.process_docx(config.templates[doc_type], replacements, output_path):
-                abort(500, description="Document processing failed")
-            
-            # Serve file
-            return serve_s3_file_as_attachment(s3_client, config.bucket_name, output_path, output_filename)
-            
-        except Exception as e:
-            logger.error(f"Document processing error: {e}")
-            abort(500, description="Internal server error")
-    
-    @app.errorhandler(400)
-    def bad_request(error):
-        return render_template('error.html', error="Bad Request", message=str(error.description)), 400
-    
-    @app.errorhandler(500)
-    def internal_error(error):
-        return render_template('error.html', error="Internal Server Error", message="Something went wrong"), 500
-    
-    return app
+        form_data = request.form.to_dict()
+        logger.info(f"Processing form data: {list(form_data.keys())}")
+        
+        # Validate form data
+        if not form_processor.validate_form_data(form_data):
+            return jsonify({"error": "Missing required form fields"}), 400
+        
+        # Build replacements
+        replacements = form_processor.build_replacements(form_data)
+        
+        # Handle petitioner address
+        if request.form.get('petitioner_address_checker') == 'on':
+            village = replacements.get("(VILLAGE)", "")
+            taluk = replacements.get("(TALUK)", "")
+            district = replacements.get("(DISTRICT)", "")
+            pincode = replacements.get("(PINCODE)", "")
+            replacements["(PETITIONER_ADDRESS)"] = f"{village} Village, {taluk} Taluk, {district} District. PIN -{pincode}"
+        else:
+            replacements["(PETITIONER_ADDRESS)"] = ""
+        
+        # Generate output filename and path
+        output_filename = f"{doc_processor.get_custom_datetime_format()}_output.docx"
+        output_path = f"{config.output_prefix}{output_filename}"
+        
+        # Process document
+        if not doc_processor.process_docx(config.template_file, replacements, output_path):
+            return jsonify({"error": "Document processing failed"}), 500
+        
+        # Serve file
+        return serve_s3_file_as_attachment(s3_client, config.bucket_name, output_path, output_filename)
+        
+    except Exception as e:
+        logger.error(f"Form processing error: {e}")
+        return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
-def main():
-    """Main application entry point"""
-    config = AppConfig(
-        debug=os.getenv('FLASK_DEBUG', 'True').lower() == 'true',
-        host=os.getenv('FLASK_HOST', '0.0.0.0'),
-        port=int(os.getenv('FLASK_PORT', 5000))
-    )
-    
-    app = create_app(config)
-    app.run(host=config.host)
+@app.route("/download-document/<doc_type>", methods=["POST"])
+def download_document(doc_type):
+    """Handle document download"""
+    try:
+        # Check if services are available
+        if not s3_client or not doc_processor:
+            return jsonify({"error": "Service temporarily unavailable"}), 503
+            
+        # Check if document type exists
+        if doc_type not in config.templates:
+            return jsonify({"error": f"Document type '{doc_type}' not found"}), 404
+            
+        form_data = request.form.to_dict()
+        logger.info(f"Processing document download for type: {doc_type}")
+        
+        # Validate form data
+        if not form_processor.validate_form_data(form_data):
+            return jsonify({"error": "Missing required form fields"}), 400
+        
+        replacements = form_processor.build_replacements(form_data)
+        
+        # Handle petitioner address
+        if request.form.get('petitioner_address_checker') == 'on':
+            village = replacements.get("(VILLAGE)", "")
+            taluk = replacements.get("(TALUK)", "")
+            district = replacements.get("(DISTRICT)", "")
+            pincode = replacements.get("(PINCODE)", "")
+            replacements["(PETITIONER_ADDRESS)"] = f"{village} Village, {taluk} Taluk, {district} District. PIN -{pincode}"
+        else:
+            replacements["(PETITIONER_ADDRESS)"] = ""
+        
+        # Generate output filename and path for document
+        output_filename = f"{doc_processor.get_custom_datetime_format()}_{doc_type}_output.docx"
+        output_path = f"{config.output_prefix}{output_filename}"
+        
+        # Process document
+        template_path = config.templates[doc_type]
+        if not doc_processor.process_docx(template_path, replacements, output_path):
+            return jsonify({"error": "Document processing failed"}), 500
+        
+        # Serve file
+        return serve_s3_file_as_attachment(s3_client, config.bucket_name, output_path, output_filename)
+        
+    except Exception as e:
+        logger.error(f"Document processing error: {e}")
+        return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
+@app.route("/health")
+def health_check():
+    """Health check endpoint"""
+    return jsonify({
+        "status": "healthy",
+        "s3_available": s3_client is not None,
+        "fields_loaded": len(FIELDS) > 0,
+        "templates_configured": len(config.templates),
+        "timestamp": datetime.now().isoformat()
+    })
+
+@app.route("/debug")
+def debug_info():
+    """Debug information endpoint"""
+    return jsonify({
+        "environment_variables": {
+            "AWS_ACCESS_KEY_ID": "***" if os.getenv('AWS_ACCESS_KEY_ID') else "Not set",
+            "AWS_SECRET_ACCESS_KEY": "***" if os.getenv('AWS_SECRET_ACCESS_KEY') else "Not set",
+            "AWS_REGION": os.getenv('AWS_REGION', 'Not set'),
+            "S3_BUCKET_NAME": os.getenv('S3_BUCKET_NAME', 'Not set')
+        },
+        "file_structure": {
+            "files_in_directory": os.listdir('.'),
+            "template_file_exists": os.path.exists(config.template_file),
+            "template_files": {name: os.path.exists(path) for name, path in config.templates.items()}
+        },
+        "services": {
+            "s3_client": s3_client is not None,
+            "doc_processor": doc_processor is not None,
+            "fields_count": len(FIELDS)
+        }
+    })
+
+@app.errorhandler(400)
+def bad_request(error):
+    return jsonify({"error": "Bad Request", "message": str(error.description)}), 400
+
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({"error": "Not Found", "message": "The requested resource was not found"}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({"error": "Internal Server Error", "message": "Something went wrong"}), 500
+
+# For local development
 if __name__ == '__main__':
-    main()
+    app.run(debug=False, host='0.0.0.0', port=5000)
