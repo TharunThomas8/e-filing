@@ -23,14 +23,14 @@ load_dotenv()
 class AppConfig:
     """Application configuration class"""
     bucket_name: str = "efiling-store"
-    template_file: str = "./forms/template.docx"
+    template_file: str = "template.docx"
     templates: Dict[str, str] = field(default_factory=lambda: {
-        "docket-template": "./forms/docket_template.docx",
-        "e-stamping-template": "./forms/e_stamping_template.docx",
-        "Intex-template": "./forms/Intex_template.docx",
-        "notice-to-all-respondants-template": "./forms/notice_to_all_respondants_template.docx",
-        "process-memo-template": "./forms/process_memo_template.docx",
-        "vakkalath-template": "./forms/vakkalath_template.docx"
+        "docket-template": "docket_template.docx",
+        "e-stamping-template": "e_stamping_template.docx",
+        "Intex-template": "Intex_template.docx",
+        "notice-to-all-respondants-template": "notice_to_all_respondants_template.docx",
+        "process-memo-template": "process_memo_template.docx",
+        "vakkalath-template": "vakkalath_template.docx"
         
     })
     output_prefix: str = "/output/"
