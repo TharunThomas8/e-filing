@@ -325,7 +325,7 @@ def main():
     )
     
     app = create_app(config)
-    app.run(host=config.host, port=config.port, debug=config.debug)
+    app.run(host=config.host)
 
 if __name__ == '__main__':
     main()
