@@ -70,7 +70,7 @@ class DocumentProcessor:
         
         now = datetime.now()
         day = now.day
-        suffix = get_ordinal_suffix(day)
+        suffix = get_ordinal_suffix(day) + ' day of'
         return f"{day}{suffix} {now.strftime('%B, %Y')}"
     
     @staticmethod
@@ -98,45 +98,92 @@ class DocumentProcessor:
         return formatted_rest + ',' + last_three
 
     def _replace_text_in_docx(self, doc: Document, replacements: Dict[str, str]) -> None:
-        """Replace text in document paragraphs and tables"""
+        """Replace text in document paragraphs and tables while preserving formatting"""
         # Replace text in paragraphs
         for paragraph in doc.paragraphs:
-            original_text = paragraph.text
-            for old_text, new_text in replacements.items():
-                if old_text in original_text:
-                    paragraph.text = original_text.replace(old_text, str(new_text))
-                    original_text = paragraph.text
-        
+            self._replace_text_in_paragraph(paragraph, replacements)
+    
         # Replace text in tables
         for table in doc.tables:
             for row in table.rows:
                 for cell in row.cells:
-                    original_text = cell.text
-                    for old_text, new_text in replacements.items():
-                        if old_text in original_text:
-                            cell.text = original_text.replace(old_text, str(new_text))
-                            original_text = cell.text
-    
+                    for paragraph in cell.paragraphs:
+                        self._replace_text_in_paragraph(paragraph, replacements)
+
+    def _replace_text_in_paragraph(self, paragraph, replacements: Dict[str, str]) -> None:
+        """Replace text in a paragraph while preserving formatting"""
+        # Get the full text of the paragraph
+        full_text = paragraph.text
+        
+        # Check if any replacements are needed
+        needs_replacement = False
+        for old_text in replacements.keys():
+            if old_text in full_text:
+                needs_replacement = True
+                break
+        
+        if not needs_replacement:
+            return
+        
+        # Perform all replacements on the full text
+        modified_text = full_text
+        for old_text, new_text in replacements.items():
+            modified_text = modified_text.replace(old_text, str(new_text))
+        
+        # If text hasn't changed, no need to update
+        if modified_text == full_text:
+            return
+        
+        # Clear existing runs and add new text with base formatting
+        if paragraph.runs:
+            # Preserve the formatting of the first run
+            first_run = paragraph.runs[0]
+            font = first_run.font
+            
+            # Store formatting properties
+            font_name = font.name
+            font_size = font.size
+            bold = font.bold
+            italic = font.italic
+            underline = font.underline
+            color = font.color.rgb if font.color.rgb else None
+            
+            # Clear all runs
+            paragraph.clear()
+            
+            # Add new run with preserved formatting
+            new_run = paragraph.add_run(modified_text)
+            new_run.font.name = font_name
+            new_run.font.size = font_size
+            new_run.font.bold = bold
+            new_run.font.italic = italic
+            new_run.font.underline = underline
+            if color:
+                new_run.font.color.rgb = color
+        else:
+            # If no runs exist, just add the text
+            paragraph.add_run(modified_text)
+
     def process_docx(self, template_path: str, replacements: Dict[str, str], output_path: str) -> bool:
         """Process DOCX template with replacements and upload to S3"""
         try:
             if not os.path.exists(template_path):
                 logger.error(f"Template file not found: {template_path}")
                 return False
-            
+        
             doc = Document(template_path)
             self._replace_text_in_docx(doc, replacements)
-            
+        
             # Save to in-memory buffer
             output_stream = io.BytesIO()
             doc.save(output_stream)
             output_stream.seek(0)
-            
+        
             # Upload to S3
             self.s3_client.upload_fileobj(output_stream, self.bucket_name, output_path)
             logger.info(f"Document successfully processed and uploaded: {output_path}")
             return True
-            
+        
         except FileNotFoundError as e:
             logger.error(f"Template file not found: {e}")
             return False
@@ -190,7 +237,7 @@ class FormDataProcessor:
         computed = {}
         
         # Build cause of action text
-        cause_of_action = f"The cause of action for this claim petition arose on {replacements.get('(DATE1)', '')}, when the petitioner received a notice from the respondent. "
+        cause_of_action = f"The cause of action for this claim petition arose on {replacements.get('(DATE1)', '')}. "
         
         # Add compensation amounts if present
         compensation_amounts = [
@@ -215,7 +262,7 @@ class FormDataProcessor:
         ares2 = replacements.get("(ARES2)", "0")
         syno2 = replacements.get("(SYNO2)", "")
         if ares2 and ares2 != "0":
-            computed["(ARES2)"] = f"and {ares2} in Sy.No. {syno2}"
+            computed["(ARES2)"] = f"and {ares2} of property comprised in Sy.No. {syno2}"
         else:
             computed["(ARES2)"] = ""
         
@@ -225,10 +272,10 @@ class FormDataProcessor:
         
         # Calculate total amount
         try:
-            amount1 = int(replacements.get("(AMNT1)", 0) or 0)
-            amount2 = int(replacements.get("(AMNT2)", 0) or 0)
-            amount3 = int(replacements.get("(AMNT3)", 0) or 0)
-            computed["(TOTAL_AMOUNT)"] = str(amount1 + amount2 + amount3)
+            amount1 = int((replacements.get("(AMNT1)", "0") or "0").replace(",", ""))
+            amount2 = int((replacements.get("(AMNT2)", "0") or "0").replace(",", ""))
+            amount3 = int((replacements.get("(AMNT3)", "0") or "0").replace(",", ""))
+            computed["(TOTAL_AMOUNT)"] = DocumentProcessor.format_number_indian(str(amount1 + amount2 + amount3))
         except (ValueError, TypeError):
             computed["(TOTAL_AMOUNT)"] = "0"
             logger.warning("Failed to calculate total amount")
