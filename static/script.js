@@ -1,13 +1,12 @@
 document.getElementById('clear_btn').addEventListener('click', function() {
-const confirmClear = confirm("Are you sure you want to clear all form fields?");
-
-if (confirmClear) {
-    const inputs = document.querySelectorAll('input');
-    
-    inputs.forEach(input => {
-    input.value = '';
-    });
-}
+    const confirmClear = confirm("Are you sure you want to clear all form fields?");
+    if (confirmClear) {
+        const inputs = document.querySelectorAll('input');
+        
+        inputs.forEach(input => {
+        input.value = '';
+        });
+    }
 });
 
 function convertToWords(input) {

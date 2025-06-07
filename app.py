@@ -9,6 +9,7 @@ from botocore.exceptions import NoCredentialsError
 from dotenv import load_dotenv
 import logging
 from typing import Dict, Any, Optional
+import zipfile
 from dataclasses import dataclass, field
 
 # Configure logging
@@ -369,6 +370,95 @@ def download_document(doc_type):
         
     except Exception as e:
         logger.error(f"Document processing error: {e}")
+        return jsonify({"error": "Internal server error", "details": str(e)}), 500
+
+# Download all from S3 for serving the zip file
+@app.route("/download-all-documents-s3", methods=["POST"])
+def download_all_documents_s3():
+    """Handle download of all documents as a zip file (served from S3)"""
+    try:
+        # Check if services are available
+        if not s3_client or not doc_processor:
+            return jsonify({"error": "Service temporarily unavailable"}), 503
+        
+        form_data = request.form.to_dict()
+        logger.info("Processing download all documents request (S3 version)")
+        
+        # Validate form data
+        if not form_processor.validate_form_data(form_data):
+            return jsonify({"error": "Missing required form fields"}), 400
+        
+        # Build replacements once for all documents
+        replacements = form_processor.build_replacements(form_data)
+        
+        # Handle petitioner address
+        if request.form.get('petitioner_address_checker') == 'on':
+            village = replacements.get("(VILLAGE)", "")
+            taluk = replacements.get("(TALUK)", "")
+            district = replacements.get("(DISTRICT)", "")
+            pincode = replacements.get("(PINCODE)", "")
+            replacements["(PETITIONER_ADDRESS)"] = f"{village} Village, {taluk} Taluk, {district} District. PIN -{pincode}"
+        else:
+            replacements["(PETITIONER_ADDRESS)"] = ""
+        
+        # Create in-memory zip file
+        zip_buffer = io.BytesIO()
+        datetime_stamp = doc_processor.get_custom_datetime_format()
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            processed_docs = []
+            failed_docs = []
+            
+            # Process each document type
+            for doc_type, template_path in config.templates.items():
+                try:
+                    # Generate output filename and path for this document
+                    output_filename = f"{datetime_stamp}_{doc_type}_output.docx"
+                    output_path = f"{config.output_prefix}{output_filename}"
+                    
+                    # Process document
+                    if doc_processor.process_docx(template_path, replacements, output_path):
+                        # Download the processed file from S3
+                        try:
+                            response = s3_client.get_object(Bucket=config.bucket_name, Key=output_path)
+                            file_content = response['Body'].read()
+                            
+                            # Add to zip file
+                            zip_file.writestr(output_filename, file_content)
+                            processed_docs.append(doc_type)
+                            logger.info(f"Added {doc_type} to zip file")
+                            
+                        except Exception as s3_error:
+                            logger.error(f"Failed to retrieve {doc_type} from S3: {s3_error}")
+                            failed_docs.append(doc_type)
+                    else:
+                        logger.error(f"Failed to process document type: {doc_type}")
+                        failed_docs.append(doc_type)
+                        
+                except Exception as doc_error:
+                    logger.error(f"Error processing {doc_type}: {doc_error}")
+                    failed_docs.append(doc_type)
+        
+        # Check if any documents were processed
+        if not processed_docs:
+            return jsonify({"error": "Failed to process any documents"}), 500
+        
+        # Upload zip file to S3
+        zip_filename = f"{datetime_stamp}_all_documents.zip"
+        zip_s3_path = f"{config.output_prefix}{zip_filename}"
+        
+        s3_client.put_object(
+            Bucket=config.bucket_name,
+            Key=zip_s3_path,
+            Body=zip_buffer.getvalue(),
+            ContentType='application/zip'
+        )
+        
+        # Serve zip file from S3
+        return serve_s3_file_as_attachment(s3_client, config.bucket_name, zip_s3_path, zip_filename)
+        
+    except Exception as e:
+        logger.error(f"Download all documents error: {e}")
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
 @app.route("/health")
