@@ -6,7 +6,7 @@ FIELDS = [
     {"name": "village", "label": "Village", "placeholder": "(VILLAGE)", "datatype": "text"},
     {"name": "taluk", "label": "Taluk", "placeholder": "(TALUK)", "datatype": "text"},
     {"name": "town", "label": "Town", "placeholder": "(TOWN)", "datatype": "text"},
-    {"name": "pincode", "label": "Pincode", "placeholder": "(PINCODE)", "datatype": "number"},
+    {"name": "pincode", "label": "Pincode", "placeholder": "(PINCODE)", "datatype": "text"},
     {"name": "petitioner_details", "label": "Other Petitioner Details", "placeholder": "(PETITIONER_DETAILS)", "datatype": "text"},
     {"name": "sof_p1_fdr_loc", "label": "Double Circuit Feeder Location", "placeholder": "(Double_Circuit_Feeder_Location)", "datatype": "text"},
     {"name": "sof_p2_ares1", "label": "Extent in Ares 1", "placeholder": "(ARES1)", "datatype": "text"},

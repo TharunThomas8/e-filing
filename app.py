@@ -35,6 +35,7 @@ class AppConfig:
     bucket_name: str = os.getenv("S3_BUCKET_NAME", "efiling-store")
     template_file: str = "template.docx"
     templates: Dict[str, str] = field(default_factory=lambda: {
+        "base-template": "template.docx",
         "docket-template": "docket_template.docx",
         "e-stamping-template": "e_stamping_template.docx",
         "Intex-template": "Intex_template.docx",
@@ -80,7 +81,22 @@ class DocumentProcessor:
         except (ValueError, TypeError) as e:
             logger.warning(f"Date conversion failed for {date_str}: {e}")
             return date_str or ""
-    
+
+    @staticmethod
+    def format_number_indian(number: str) -> str:
+        """Convert an integer to a string with commas in Indian number format"""
+        if len(number) <= 3:
+            return number
+
+        last_three = number[-3:]
+        rest = number[:-3]
+
+        # Reverse, group by 2s, reverse again
+        rest = rest[::-1]
+        grouped = [rest[i:i+2] for i in range(0, len(rest), 2)]
+        formatted_rest = ','.join(grouped)[::-1]
+        return formatted_rest + ',' + last_three
+
     def _replace_text_in_docx(self, doc: Document, replacements: Dict[str, str]) -> None:
         """Replace text in document paragraphs and tables"""
         # Replace text in paragraphs
@@ -155,10 +171,12 @@ class FormDataProcessor:
             field_name = field["name"]
             placeholder = field["placeholder"]
             field_value = data.get(field_name, "")
+            field_type = field.get("datatype")
             
-            if field.get("datatype") == "date":
+            if field_type.strip() == "date":
                 field_value = DocumentProcessor.convert_date_format(field_value)
-            
+            if field_type.strip() == "number":
+                field_value = DocumentProcessor.format_number_indian(field_value)
             replacements[placeholder] = str(field_value)
         
         # Add computed fields
@@ -177,8 +195,8 @@ class FormDataProcessor:
         # Add compensation amounts if present
         compensation_amounts = [
             ("(COA_AMNT3)", "The petitioner received an amount of {} as tower foot area compensation. "),
-            ("(COA_AMNT1)", "The petitioner also received an amount of {} as tower foot area compensation. "),
-            ("(COA_AMNT2)", "Thereafter the petitioner received an amount of {} as tower foot area compensation. ")
+            ("(COA_AMNT1)", "The petitioner also received an amount of {} as trees cut and removed compensation. "),
+            ("(COA_AMNT2)", "Thereafter the petitioner received an amount of {} as right of way compensation. ")
         ]
         
         for amount_key, template in compensation_amounts:
@@ -243,51 +261,15 @@ form_processor = FormDataProcessor()
 if s3_client:
     doc_processor = DocumentProcessor(s3_client, config.bucket_name)
 
-@app.route("/", methods=["GET", "POST"])
+@app.route("/", methods=["GET"])
 def form():
-    """Main form handler"""
+    """Main page render"""
     try:
         if request.method == "GET":
             if not FIELDS:
                 return jsonify({"error": "Form fields not configured"}), 500
             return render_template("form.html", fields=FIELDS)
-        
-        # Check if services are available
-        if not s3_client or not doc_processor:
-            return jsonify({"error": "Service temporarily unavailable - S3 not configured"}), 503
-        
-        # Process POST request
-        form_data = request.form.to_dict()
-        logger.info(f"Processing form data: {list(form_data.keys())}")
-        
-        # Validate form data
-        if not form_processor.validate_form_data(form_data):
-            return jsonify({"error": "Missing required form fields"}), 400
-        
-        # Build replacements
-        replacements = form_processor.build_replacements(form_data)
-        
-        # Handle petitioner address
-        if request.form.get('petitioner_address_checker') == 'on':
-            village = replacements.get("(VILLAGE)", "")
-            taluk = replacements.get("(TALUK)", "")
-            district = replacements.get("(DISTRICT)", "")
-            pincode = replacements.get("(PINCODE)", "")
-            replacements["(PETITIONER_ADDRESS)"] = f"{village} Village, {taluk} Taluk, {district} District. PIN -{pincode}"
-        else:
-            replacements["(PETITIONER_ADDRESS)"] = ""
-        
-        # Generate output filename and path
-        output_filename = f"{doc_processor.get_custom_datetime_format()}_output.docx"
-        output_path = f"{config.output_prefix}{output_filename}"
-        
-        # Process document
-        if not doc_processor.process_docx(config.template_file, replacements, output_path):
-            return jsonify({"error": "Document processing failed"}), 500
-        
-        # Serve file
-        return serve_s3_file_as_attachment(s3_client, config.bucket_name, output_path, output_filename)
-        
+
     except Exception as e:
         logger.error(f"Form processing error: {e}")
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
@@ -310,6 +292,7 @@ def download_document(doc_type):
         # Validate form data
         if not form_processor.validate_form_data(form_data):
             return jsonify({"error": "Missing required form fields"}), 400
+        
         
         replacements = form_processor.build_replacements(form_data)
         
