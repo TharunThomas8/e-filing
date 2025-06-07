@@ -38,7 +38,7 @@ class AppConfig:
         "base-template": "template.docx",
         "docket-template": "docket_template.docx",
         "e-stamping-template": "e_stamping_template.docx",
-        "Intex-template": "Intex_template.docx",
+        "Index-template": "Index_template.docx",
         "notice-to-all-respondants-template": "notice_to_all_respondants_template.docx",
         "process-memo-template": "process_memo_template.docx",
         "vakkalath-template": "vakkalath_template.docx"
@@ -279,6 +279,8 @@ class FormDataProcessor:
         except (ValueError, TypeError):
             computed["(TOTAL_AMOUNT)"] = "0"
             logger.warning("Failed to calculate total amount")
+        
+        computed["(ESTABLISHMENT)"] = replacements.get("(ESTABLISHMENT)").upper()
         
         return computed
 
