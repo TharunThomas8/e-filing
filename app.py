@@ -238,24 +238,12 @@ class FormDataProcessor:
         computed = {}
         
         # Build cause of action text
-        cause_of_action = f"The cause of action for this claim petition arose on {replacements.get('(DATE1)', '')}. "
-        
-        # Add compensation amounts if present
-        compensation_amounts = [
-            ("(COA_AMNT3)", "The petitioner received an amount of {} as tower foot area compensation. "),
-            ("(COA_AMNT1)", "The petitioner also received an amount of {} as trees cut and removed compensation. "),
-            ("(COA_AMNT2)", "Thereafter the petitioner received an amount of {} as right of way compensation. ")
-        ]
-        
-        for amount_key, template in compensation_amounts:
-            amount = replacements.get(amount_key, "0")
-            if amount and amount != "0":
-                cause_of_action += template.format(amount)
+        cause_of_action = f"The cause of action for this claim petition arose on {replacements.get('(DATE1)', '')}, when the respondent initiated proceedings to draw electrical lines through the property of the petitioner, and thereafter on {replacements.get('(COA_DATE1)', '')}, when the respondent paid an amount of ₹{replacements.get('(COA_AMNT1)', '')} as compensation to the petitioner."
         
         # Add jurisdiction clause
         village = replacements.get("(VILLAGE)", "")
         taluk = replacements.get("(TALUK)", "")
-        cause_of_action += f"And there after continually at {village} Village in {taluk} Taluk which is within the jurisdiction of this Honourable Court."
+        cause_of_action += f"Thereafter, continuously at {village} Village in {taluk} Taluk which is within the jurisdiction of this Honourable Court."
         
         computed["(CAUSE_OF_ACTION)"] = cause_of_action
         
