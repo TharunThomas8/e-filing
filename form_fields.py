@@ -15,6 +15,7 @@ FIELDS = [
     {"name": "sof_p2_ares2", "label": "Extent in Ares 2", "placeholder": "(ARES2)", "datatype": "text"},
     {"name": "sof_p2_syno2", "label": "Ares 2 Sy.No", "placeholder": "(SYNO2)", "datatype": "text"},
     # {"name": "sof_p5_adj_loc", "label": "Adjacent Town", "placeholder": "(ADJ_LOC)", "datatype": "text"},
+    {"name": "sof_p5_distance_town", "label": "Distance From Town", "placeholder": "(DISTANCE_TOWN)", "datatype": "number"},
     {"name": "sof_p5_market_value", "label": "Market Value Per Cent", "placeholder": "(MARKET_VALUE)", "datatype": "number"},
     # {"name": "sof_p7_balance_cents", "label": "Balance Cents (Nominal Land)", "placeholder": "(CENTS_BALANCE)", "datatype": "number"},
     {"name": "sof_p8_date1", "label": "Cause of Action Date (DD.MM.YYYY)", "placeholder": "(DATE1)", "datatype": "text"}, # In cause of action

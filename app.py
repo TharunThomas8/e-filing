@@ -238,7 +238,7 @@ class FormDataProcessor:
         computed = {}
         
         # Build cause of action text
-        cause_of_action = f"The cause of action for this claim petition arose on {replacements.get('(DATE1)', '')}, when the respondent initiated proceedings to draw electrical lines through the property of the petitioner, and thereafter on {replacements.get('(COA_DATE1)', '')}, when the respondent paid an amount of ₹{replacements.get('(COA_AMNT1)', '')} as compensation to the petitioner."
+        cause_of_action = f"The cause of action for this claim petition arose on {replacements.get('(DATE1)', '')}, when the respondent initiated proceedings to draw electrical lines through the property of the petitioner, and thereafter on {replacements.get('(COA_DATE1)', '')}, when the respondent paid an amount of ₹ {replacements.get('(COA_AMNT1)', '')} as compensation to the petitioner."
         
         # Add jurisdiction clause
         village = replacements.get("(VILLAGE)", "")
